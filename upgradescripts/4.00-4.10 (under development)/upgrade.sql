@@ -113,6 +113,12 @@ set @resources='
   <LocaleResource Name="Admin.Configuration.Settings.Vendor.ShowVendorOnOrderDetailsPage.Hint">
     <Value>Check to show vendor name of product on the order details page.</Value>
   </LocaleResource>
+  <LocaleResource Name="Admin.Configuration.Settings.Catalog.NotifyCustomerAboutProductReviewReply">
+    <Value>Notify customer about product review reply</Value>
+  </LocaleResource>
+  <LocaleResource Name="Admin.Configuration.Settings.Catalog.NotifyCustomerAboutProductReviewReply.Hint">
+    <Value>Check to notify customer about product review reply.</Value>
+  </LocaleResource>
 </Language>
 '
 
@@ -231,5 +237,37 @@ IF NOT EXISTS (SELECT 1 FROM [Setting] WHERE [name] = N'addresssettings.preselec
 BEGIN
 	INSERT [Setting] ([Name], [Value], [StoreId])
 	VALUES (N'addresssettings.preselectcountryifonlyone', N'false', 0)
+END
+GO
+
+-- new message template
+ IF NOT EXISTS (SELECT 1 FROM [dbo].[MessageTemplate] WHERE [Name] = N'ProductReview.Reply.CustomerNotification')
+ BEGIN
+    DECLARE @NewLine AS CHAR(2) = CHAR(13) + CHAR(10)
+	INSERT [dbo].[MessageTemplate] ([Name], [BccEmailAddresses], [Subject], [Body], [IsActive], [AttachedDownloadId], [EmailAccountId], [LimitedToStores], [DelayPeriodId]) 
+	VALUES (N'ProductReview.Reply.CustomerNotification', NULL, N'%Store.Name%. Product review reply.', N'<p>' + @NewLine + '<a href="%Store.URL%">%Store.Name%</a>' + @NewLine + '<br />' + @NewLine + '<br />' + @NewLine + 'Hello %Customer.FullName%,' + @NewLine + '<br />' + @NewLine + 'You received a reply from the store administration to your review for product "%ProductReview.ProductName%".' + @NewLine + '</p>' + @NewLine, 0, 0, 0, 0, 0)
+ END
+ GO
+ 
+--new column
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = object_id('[ProductReview]') AND NAME = 'CustomerNotifiedOfReply')
+BEGIN
+	ALTER TABLE [ProductReview]
+	ADD [CustomerNotifiedOfReply] BIT NULL
+END
+GO
+
+UPDATE [ProductReview]
+SET [CustomerNotifiedOfReply] = 0
+WHERE [CustomerNotifiedOfReply] IS NULL
+
+ALTER TABLE [ProductReview] ALTER COLUMN [CustomerNotifiedOfReply] BIT NOT NULL
+GO
+
+--new setting
+IF NOT EXISTS (SELECT 1 FROM [Setting] WHERE [name] = N'catalogsettings.notifycustomeraboutproductreviewreply')
+BEGIN
+	INSERT [Setting] ([Name], [Value], [StoreId])
+	VALUES (N'catalogsettings.notifycustomeraboutproductreviewreply', N'false', 0)
 END
 GO
